@@ -1,14 +1,16 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { ImageIcon } from 'lucide-react';
 import type { Post } from '../../types';
 import { PLATFORM_CONFIG, STATUS_CONFIG } from '../../utils/constants';
 
 interface PostCardProps {
   post: Post;
   onClick: () => void;
+  imageCount?: number;
 }
 
-export function PostCard({ post, onClick }: PostCardProps) {
+export function PostCard({ post, onClick, imageCount }: PostCardProps) {
   const {
     attributes,
     listeners,
@@ -76,6 +78,11 @@ export function PostCard({ post, onClick }: PostCardProps) {
           ))}
           {post.tags.length > 2 && (
             <span className="text-[10px] text-gray-400">+{post.tags.length - 2}</span>
+          )}
+          {!!imageCount && (
+            <span className="text-[10px] inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 ml-auto">
+              <ImageIcon size={10} /> {imageCount}
+            </span>
           )}
         </div>
       </div>

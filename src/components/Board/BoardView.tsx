@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -9,8 +9,8 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { useState } from 'react';
 import type { Post, DateRange } from '../../types';
+import { usePostImageCounts } from '../../hooks/usePostImageCounts';
 import { DayColumn } from './DayColumn';
 import { PostCard } from './PostCard';
 import { MonthDayCell } from './MonthDayCell';
@@ -34,6 +34,7 @@ export function BoardView({ posts, onPostClick, onAddPost, onMovePost }: BoardVi
   const [dateRange, setDateRange] = useState<DateRange>('week');
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; dateStr: string } | null>(null);
+  const imageCounts = usePostImageCounts();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -214,6 +215,7 @@ export function BoardView({ posts, onPostClick, onAddPost, onMovePost }: BoardVi
                       posts={postsByDate[dateStr] || []}
                       onPostClick={onPostClick}
                       onAddPost={onAddPost}
+                      imageCounts={imageCounts}
                     />
                   </div>
                 );

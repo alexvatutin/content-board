@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Copy, Trash2, Link, ClipboardCopy } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { MetricsSection } from './MetricsSection';
+import { ImageUploader } from './ImageUploader';
 import type { Post, SocialPlatform, PostStatus, ContentFormat } from '../../types';
 import { PLATFORM_CONFIG, STATUS_CONFIG, FORMAT_CONFIG, PLATFORMS, STATUSES, FORMATS } from '../../utils/constants';
 
@@ -148,6 +149,13 @@ export function PostModal({ post, isOpen, onClose, onSave, onDelete, onDuplicate
             </select>
           </div>
         </div>
+
+        {/* Images */}
+        <ImageUploader
+          postId={post.id}
+          platform={(form.platform || 'telegram') as SocialPlatform}
+          format={(form.format || 'post') as ContentFormat}
+        />
 
         {/* Date & Time */}
         <div className="grid grid-cols-2 gap-3">

@@ -1,8 +1,14 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import type { Post, PostMetrics, SocialPlatform, PostStatus, ContentFormat } from '../types';
-// PLATFORMS, STATUSES, FORMATS replaced by alias maps for flexible import
 import { format } from 'date-fns';
+import {
+  getImagesByPostId,
+  blobToDataUrl,
+  dataUrlToBlob,
+  addImageFromBlob,
+  getImageCounts,
+} from './imageStore';
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -25,6 +31,7 @@ const FLAT_COLUMNS = [
   'id', 'title', 'content', 'platform', 'format',
   'scheduledDate', 'scheduledTime', 'status', 'tags',
   'publishedUrl', 'notes', 'createdAt', 'updatedAt',
+  'imageCount',
   'metrics_reach', 'metrics_impressions', 'metrics_likes',
   'metrics_comments', 'metrics_shares', 'metrics_saves',
   'metrics_linkClicks', 'metrics_followsGained', 'metrics_custom',
@@ -32,7 +39,7 @@ const FLAT_COLUMNS = [
 
 type FlatRow = Record<string, string | number | undefined>;
 
-function postToFlatRow(post: Post): FlatRow {
+function postToFlatRow(post: Post, imageCount = 0): FlatRow {
   const row: FlatRow = {
     id: post.id,
     title: post.title,
@@ -47,6 +54,7 @@ function postToFlatRow(post: Post): FlatRow {
     notes: post.notes || '',
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
+    imageCount,
     metrics_reach: post.metrics?.reach,
     metrics_impressions: post.metrics?.impressions,
     metrics_likes: post.metrics?.likes,
@@ -189,6 +197,7 @@ const TEMPLATE_ROW: FlatRow = {
   notes: '',
   createdAt: '',
   updatedAt: '',
+  imageCount: 0,
   metrics_reach: '',
   metrics_impressions: '',
   metrics_likes: '',
@@ -243,36 +252,65 @@ export function downloadTemplate(fmt: 'json' | 'csv' | 'xlsx') {
 
 // ── JSON ─────────────────────────────────────────────────
 
-export function exportToJSON(posts: Post[]): void {
-  const data = JSON.stringify(posts, null, 2);
+export async function exportToJSON(posts: Post[]): Promise<void> {
+  const postsWithImages = [];
+  for (const post of posts) {
+    const images = await getImagesByPostId(post.id);
+    const imageData = [];
+    for (const img of images) {
+      const dataUrl = await blobToDataUrl(img.blob);
+      imageData.push({
+        id: img.id,
+        order: img.order,
+        filename: img.filename,
+        mimeType: img.mimeType,
+        dataUrl,
+      });
+    }
+    postsWithImages.push({
+      ...post,
+      ...(imageData.length > 0 ? { images: imageData } : {}),
+    });
+  }
+  const data = JSON.stringify(postsWithImages, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   triggerDownload(blob, `content-plan-${dateSuffix()}.json`);
 }
 
-export function importFromJSON(file: File): Promise<Post[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        if (!Array.isArray(data)) {
-          reject(new Error('Неверный формат файла'));
-          return;
+export async function importFromJSON(file: File): Promise<Post[]> {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  if (!Array.isArray(data)) throw new Error('Неверный формат файла');
+
+  const posts: Post[] = [];
+  for (const item of data) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { images, ...post } = item;
+    posts.push(post as Post);
+
+    if (Array.isArray(images)) {
+      for (const img of images) {
+        if (img.dataUrl && img.filename) {
+          const blob = dataUrlToBlob(img.dataUrl);
+          await addImageFromBlob(
+            post.id,
+            blob,
+            img.filename,
+            img.mimeType || 'image/jpeg',
+            img.order ?? 0
+          );
         }
-        resolve(data as Post[]);
-      } catch {
-        reject(new Error('Ошибка при чтении файла'));
       }
-    };
-    reader.onerror = () => reject(new Error('Ошибка при чтении файла'));
-    reader.readAsText(file);
-  });
+    }
+  }
+  return posts;
 }
 
 // ── CSV ──────────────────────────────────────────────────
 
-export function exportToCSV(posts: Post[]): void {
-  const rows = posts.map(postToFlatRow);
+export async function exportToCSV(posts: Post[]): Promise<void> {
+  const counts = await getImageCounts();
+  const rows = posts.map((p) => postToFlatRow(p, counts.get(p.id) || 0));
   const csv = '\uFEFF' + Papa.unparse(rows, { columns: [...FLAT_COLUMNS] });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   triggerDownload(blob, `content-plan-${dateSuffix()}.csv`);
@@ -303,8 +341,9 @@ export function importFromCSV(file: File): Promise<Post[]> {
 
 // ── Excel ────────────────────────────────────────────────
 
-export function exportToExcel(posts: Post[]): void {
-  const rows = posts.map(postToFlatRow);
+export async function exportToExcel(posts: Post[]): Promise<void> {
+  const counts = await getImageCounts();
+  const rows = posts.map((p) => postToFlatRow(p, counts.get(p.id) || 0));
   const ws = XLSX.utils.json_to_sheet(rows, { header: [...FLAT_COLUMNS] });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Content Plan');

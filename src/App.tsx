@@ -59,8 +59,8 @@ export default function App() {
     setSelectedPost(null);
   }
 
-  function handleExport() {
-    exportToJSON(posts);
+  async function handleExport() {
+    await exportToJSON(posts);
   }
 
   const handleImport = useCallback(() => {

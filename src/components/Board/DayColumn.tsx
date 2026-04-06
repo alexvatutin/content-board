@@ -11,9 +11,10 @@ interface DayColumnProps {
   posts: Post[];
   onPostClick: (post: Post) => void;
   onAddPost: (date: string) => void;
+  imageCounts: Map<string, number>;
 }
 
-export function DayColumn({ date, dateStr, posts, onPostClick, onAddPost }: DayColumnProps) {
+export function DayColumn({ date, dateStr, posts, onPostClick, onAddPost, imageCounts }: DayColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: dateStr });
   const today = isToday(date);
 
@@ -56,7 +57,7 @@ export function DayColumn({ date, dateStr, posts, onPostClick, onAddPost }: DayC
       >
         <SortableContext items={sorted.map((p) => p.id)} strategy={verticalListSortingStrategy}>
           {sorted.map((post) => (
-            <PostCard key={post.id} post={post} onClick={() => onPostClick(post)} />
+            <PostCard key={post.id} post={post} onClick={() => onPostClick(post)} imageCount={imageCounts.get(post.id)} />
           ))}
         </SortableContext>
 

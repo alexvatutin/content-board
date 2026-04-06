@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useLocalStorage } from './useLocalStorage';
+import { deleteImagesByPostId } from '../utils/imageStore';
 import type { Post, SocialPlatform, PostStatus, ContentFormat } from '../types';
 
 function generateId(): string {
@@ -39,6 +40,7 @@ export function usePosts() {
 
   const deletePost = useCallback((id: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
+    deleteImagesByPostId(id);
   }, [setPosts]);
 
   const duplicatePost = useCallback((id: string) => {

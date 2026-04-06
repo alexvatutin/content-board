@@ -39,6 +39,16 @@ export interface Post {
 
 export type ViewMode = 'dashboard' | 'board' | 'list' | 'analytics';
 
+export interface PostImage {
+  id: string;
+  postId: string;
+  order: number;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
 export type DateRange = 'week' | 'month' | 'custom';
 
 export interface Filters {

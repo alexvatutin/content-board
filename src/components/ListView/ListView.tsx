@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ArrowUpDown, ExternalLink } from 'lucide-react';
+import { ArrowUpDown, ExternalLink, ImageIcon } from 'lucide-react';
 import type { Post } from '../../types';
 import { PLATFORM_CONFIG, STATUS_CONFIG } from '../../utils/constants';
-import { formatDayFull } from '../../utils/dateUtils';
-import { fromISODate } from '../../utils/dateUtils';
+import { formatDayFull, fromISODate } from '../../utils/dateUtils';
+import { usePostImageCounts } from '../../hooks/usePostImageCounts';
 
 interface ListViewProps {
   posts: Post[];
@@ -15,6 +15,7 @@ type SortKey = 'scheduledDate' | 'platform' | 'title' | 'status';
 export function ListView({ posts, onPostClick }: ListViewProps) {
   const [sortKey, setSortKey] = useState<SortKey>('scheduledDate');
   const [sortAsc, setSortAsc] = useState(true);
+  const imageCounts = usePostImageCounts();
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -74,6 +75,7 @@ export function ListView({ posts, onPostClick }: ListViewProps) {
             <th className="text-left py-2 px-3"><SortHeader label="Соцсеть" field="platform" /></th>
             <th className="text-left py-2 px-3"><SortHeader label="Заголовок" field="title" /></th>
             <th className="text-left py-2 px-3"><SortHeader label="Статус" field="status" /></th>
+            <th className="text-left py-2 px-3 w-14">Фото</th>
             <th className="text-left py-2 px-3">Охват</th>
             <th className="text-left py-2 px-3 w-16">Ссылка</th>
           </tr>
@@ -112,6 +114,13 @@ export function ListView({ posts, onPostClick }: ListViewProps) {
                   >
                     {status.emoji} {status.label}
                   </span>
+                </td>
+                <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400">
+                  {(imageCounts.get(post.id) || 0) > 0 ? (
+                    <span className="inline-flex items-center gap-0.5 text-xs">
+                      <ImageIcon size={12} /> {imageCounts.get(post.id)}
+                    </span>
+                  ) : '—'}
                 </td>
                 <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400">
                   {post.metrics?.reach?.toLocaleString() ?? '—'}
