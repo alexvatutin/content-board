@@ -1,4 +1,4 @@
-import { LayoutDashboard, LayoutGrid, List, BarChart3, Download, Upload, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, List, BarChart3, Smartphone, Download, Upload, Sun, Moon } from 'lucide-react';
 import type { ViewMode } from '../../types';
 
 interface SidebarProps {
@@ -15,6 +15,7 @@ const NAV_ITEMS: { key: ViewMode; label: string; icon: typeof LayoutDashboard }[
   { key: 'board', label: 'Доска', icon: LayoutGrid },
   { key: 'list', label: 'Список', icon: List },
   { key: 'analytics', label: 'Аналитика', icon: BarChart3 },
+  { key: 'preview', label: 'Превью', icon: Smartphone },
 ];
 
 export function Sidebar({ view, onViewChange, onExport, onImport, dark, onToggleTheme }: SidebarProps) {

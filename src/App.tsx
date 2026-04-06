@@ -10,6 +10,7 @@ import { PostModal } from './components/PostModal/PostModal';
 import { ImportModal } from './components/ImportModal/ImportModal';
 import { ListView } from './components/ListView/ListView';
 import { Analytics } from './components/Analytics/Analytics';
+import { PreviewView } from './components/Preview/PreviewView';
 import { exportToJSON } from './utils/export';
 import { toISODate } from './utils/dateUtils';
 import type { Post, ViewMode } from './types';
@@ -108,6 +109,9 @@ export default function App() {
           )}
           {view === 'analytics' && (
             <Analytics posts={posts} />
+          )}
+          {view === 'preview' && (
+            <PreviewView posts={posts} />
           )}
         </main>
       </div>

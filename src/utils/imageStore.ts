@@ -165,6 +165,28 @@ export async function getImageCounts(): Promise<Map<string, number>> {
   return counts;
 }
 
+export async function getImagesByPostIds(postIds: string[]): Promise<Map<string, StoredImage[]>> {
+  const result = new Map<string, StoredImage[]>();
+  if (postIds.length === 0) return result;
+  postIds.forEach((id) => result.set(id, []));
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const idx = tx.objectStore(STORE_NAME).index('postId');
+    for (const postId of postIds) {
+      const req = idx.getAll(postId);
+      req.onsuccess = () => {
+        const images = (req.result as StoredImage[]).sort((a, b) => a.order - b.order);
+        result.set(postId, images);
+      };
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+  return result;
+}
+
 export async function getAllImages(): Promise<StoredImage[]> {
   const db = await openDB();
   const results = await new Promise<StoredImage[]>((resolve, reject) => {
