@@ -1,0 +1,79 @@
+import { LayoutDashboard, LayoutGrid, List, BarChart3, Download, Upload, Sun, Moon } from 'lucide-react';
+import type { ViewMode } from '../../types';
+
+interface SidebarProps {
+  view: ViewMode;
+  onViewChange: (view: ViewMode) => void;
+  onExport: () => void;
+  onImport: () => void;
+  dark: boolean;
+  onToggleTheme: () => void;
+}
+
+const NAV_ITEMS: { key: ViewMode; label: string; icon: typeof LayoutDashboard }[] = [
+  { key: 'dashboard', label: 'Обзор', icon: LayoutDashboard },
+  { key: 'board', label: 'Доска', icon: LayoutGrid },
+  { key: 'list', label: 'Список', icon: List },
+  { key: 'analytics', label: 'Аналитика', icon: BarChart3 },
+];
+
+export function Sidebar({ view, onViewChange, onExport, onImport, dark, onToggleTheme }: SidebarProps) {
+  return (
+    <aside className="w-52 h-full flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
+      {/* Logo */}
+      <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+          Content Board
+        </h1>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex flex-col gap-0.5 p-2 mt-1">
+        {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+          const active = view === key;
+          return (
+            <button
+              key={key}
+              onClick={() => onViewChange(key)}
+              className={`flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors ${
+                active
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-medium border-l-2 border-blue-500 pl-[10px]'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-2 border-transparent pl-[10px]'
+              }`}
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Utilities */}
+      <div className="flex flex-col gap-0.5 p-2 border-t border-gray-200 dark:border-gray-700">
+        <button
+          onClick={onExport}
+          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors"
+        >
+          <Download size={15} /> Экспорт
+        </button>
+        <button
+          onClick={onImport}
+          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors"
+        >
+          <Upload size={15} /> Импорт
+        </button>
+        <button
+          onClick={onToggleTheme}
+          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors"
+          title={dark ? 'Светлая тема' : 'Тёмная тема'}
+        >
+          {dark ? <Sun size={15} /> : <Moon size={15} />}
+          {dark ? 'Светлая тема' : 'Тёмная тема'}
+        </button>
+      </div>
+    </aside>
+  );
+}

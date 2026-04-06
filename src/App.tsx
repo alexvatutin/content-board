@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePosts } from './hooks/usePosts';
 import { useFilters } from './hooks/useFilters';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { Header } from './components/Layout/Header';
+import { Sidebar } from './components/Layout/Sidebar';
 import { FilterBar } from './components/Layout/FilterBar';
+import { Dashboard } from './components/Dashboard/Dashboard';
 import { BoardView } from './components/Board/BoardView';
 import { PostModal } from './components/PostModal/PostModal';
 import { ImportModal } from './components/ImportModal/ImportModal';
@@ -16,7 +17,7 @@ import type { Post, ViewMode } from './types';
 export default function App() {
   const { posts, createPost, updatePost, deletePost, duplicatePost, movePost, importPosts, allTags } = usePosts();
   const { filters, setFilter, setDateRange, resetFilters, filteredPosts, hasActiveFilters } = useFilters(posts);
-  const [view, setView] = useLocalStorage<ViewMode>('content-board-view', 'board');
+  const [view, setView] = useLocalStorage<ViewMode>('content-board-view', 'dashboard');
   const [dark, setDark] = useLocalStorage<boolean>('content-board-dark', true);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -67,8 +68,8 @@ export default function App() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors">
-      <Header
+    <div className="h-screen flex flex-row bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors">
+      <Sidebar
         view={view}
         onViewChange={setView}
         onExport={handleExport}
@@ -77,34 +78,39 @@ export default function App() {
         onToggleTheme={() => setDark(!dark)}
       />
 
-      {view !== 'analytics' && (
-        <FilterBar
-          filters={filters}
-          view={view}
-          onFilterChange={setFilter}
-          onDateRangeChange={setDateRange}
-          onReset={resetFilters}
-          hasActiveFilters={hasActiveFilters}
-          allTags={allTags}
-        />
-      )}
-
-      <main className="flex-1 min-h-0 overflow-auto">
-        {view === 'board' && (
-          <BoardView
-            posts={filteredPosts}
-            onPostClick={handlePostClick}
-            onAddPost={handleAddPost}
-            onMovePost={movePost}
+      <div className="flex-1 flex flex-col min-w-0">
+        {(view === 'board' || view === 'list') && (
+          <FilterBar
+            filters={filters}
+            view={view}
+            onFilterChange={setFilter}
+            onDateRangeChange={setDateRange}
+            onReset={resetFilters}
+            hasActiveFilters={hasActiveFilters}
+            allTags={allTags}
           />
         )}
-        {view === 'list' && (
-          <ListView posts={filteredPosts} onPostClick={handlePostClick} />
-        )}
-        {view === 'analytics' && (
-          <Analytics posts={posts} />
-        )}
-      </main>
+
+        <main className="flex-1 min-h-0 overflow-auto">
+          {view === 'dashboard' && (
+            <Dashboard posts={posts} onPostClick={handlePostClick} />
+          )}
+          {view === 'board' && (
+            <BoardView
+              posts={filteredPosts}
+              onPostClick={handlePostClick}
+              onAddPost={handleAddPost}
+              onMovePost={movePost}
+            />
+          )}
+          {view === 'list' && (
+            <ListView posts={filteredPosts} onPostClick={handlePostClick} />
+          )}
+          {view === 'analytics' && (
+            <Analytics posts={posts} />
+          )}
+        </main>
+      </div>
 
       <PostModal
         post={selectedPost}

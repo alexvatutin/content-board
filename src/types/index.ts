@@ -37,7 +37,7 @@ export interface Post {
   updatedAt: string;
 }
 
-export type ViewMode = 'board' | 'list' | 'analytics';
+export type ViewMode = 'dashboard' | 'board' | 'list' | 'analytics';
 
 export type DateRange = 'week' | 'month' | 'custom';
 
