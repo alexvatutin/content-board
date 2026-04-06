@@ -55,7 +55,7 @@ export function MonthDayCell({ date, dateStr, posts, isOtherMonth, onClick }: Mo
       {/* Platform dots */}
       {count > 0 && (
         <div className="flex items-center gap-0.5 px-2 pb-1.5 flex-wrap">
-          {dots.map((post, i) => (
+          {dots.map((post) => (
             <div
               key={post.id}
               className="w-[6px] h-[6px] rounded-full flex-shrink-0"
