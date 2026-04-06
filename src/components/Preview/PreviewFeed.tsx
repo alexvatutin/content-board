@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Post, SocialPlatform } from '../../types';
 import type { PreviewImageWithUrl } from '../../hooks/usePreviewImages';
 import { PLATFORM_PREVIEWS, FEED_MAX_WIDTH } from './platforms';
+import { InstagramFeed } from './InstagramFeed';
 
 interface PreviewFeedProps {
   posts: Post[];
@@ -31,6 +32,17 @@ export function PreviewFeed({ posts, platform, imagesByPostId, onPostClick }: Pr
           Нет постов для этой платформы
         </p>
       </div>
+    );
+  }
+
+  // Instagram: profile grid view
+  if (platform === 'instagram') {
+    return (
+      <InstagramFeed
+        posts={sorted}
+        imagesByPostId={imagesByPostId}
+        onPostClick={onPostClick}
+      />
     );
   }
 
