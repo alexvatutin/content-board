@@ -121,7 +121,7 @@ export async function batchInsertPosts(userId: string, posts: Post[]): Promise<v
     const batch = rows.slice(i, i + 50);
     const { error } = await supabase
       .from('posts')
-      .insert(batch);
+      .upsert(batch, { onConflict: 'id' });
 
     if (error) throw error;
   }
