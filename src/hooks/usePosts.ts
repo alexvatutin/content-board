@@ -151,11 +151,10 @@ export function usePosts() {
 
   const importPosts = useCallback((imported: Post[], replace: boolean) => {
     if (!user) return;
-    // Ensure all IDs are valid UUIDs (imported files may have numeric IDs)
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Always generate fresh UUIDs — imported IDs may collide with other users' posts
     const fixed = imported.map((p) => ({
       ...p,
-      id: UUID_RE.test(p.id) ? p.id : crypto.randomUUID(),
+      id: crypto.randomUUID(),
     }));
     if (replace) {
       setPosts(fixed);
