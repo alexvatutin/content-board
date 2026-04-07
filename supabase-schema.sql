@@ -33,14 +33,32 @@ create table post_images (
   created_at timestamptz not null default now()
 );
 
+-- ── Permissions ──────────────────────────────────────────
+grant all on posts to authenticated;
+grant all on post_images to authenticated;
+
 -- ── Row Level Security ───────────────────────────────────
 alter table posts enable row level security;
-create policy "Users manage own posts" on posts
-  for all using (auth.uid() = user_id);
+
+create policy "posts_select" on posts
+  for select using (auth.uid() = user_id);
+create policy "posts_insert" on posts
+  for insert with check (auth.uid() = user_id);
+create policy "posts_update" on posts
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "posts_delete" on posts
+  for delete using (auth.uid() = user_id);
 
 alter table post_images enable row level security;
-create policy "Users manage own images" on post_images
-  for all using (auth.uid() = user_id);
+
+create policy "images_select" on post_images
+  for select using (auth.uid() = user_id);
+create policy "images_insert" on post_images
+  for insert with check (auth.uid() = user_id);
+create policy "images_update" on post_images
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "images_delete" on post_images
+  for delete using (auth.uid() = user_id);
 
 -- ── Storage bucket ───────────────────────────────────────
 -- Create a bucket named 'post-images' in Supabase Dashboard > Storage
