@@ -1,8 +1,5 @@
+import { supabase } from '../lib/supabase';
 import type { PostImage } from '../types';
-
-const DB_NAME = 'content-board-images';
-const DB_VERSION = 1;
-const STORE_NAME = 'images';
 
 type ChangeListener = () => void;
 const listeners: Set<ChangeListener> = new Set();
@@ -16,36 +13,21 @@ function notifyChange() {
   listeners.forEach((fn) => fn());
 }
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('postId', 'postId', { unique: false });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function generateThumbnail(blob: Blob, maxWidth = 200): Promise<Blob> {
-  const img = await createImageBitmap(blob);
-  const scale = Math.min(1, maxWidth / img.width);
-  const w = Math.round(img.width * scale);
-  const h = Math.round(img.height * scale);
-  const canvas = new OffscreenCanvas(w, h);
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(img, 0, 0, w, h);
-  img.close();
-  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
-}
-
 export interface StoredImage extends PostImage {
-  blob: Blob;
-  thumbnailBlob: Blob;
+  storagePath: string;
+  thumbnailUrl: string;
+  fullUrl: string;
+}
+
+function getPublicUrl(path: string): string {
+  const { data } = supabase.storage.from('post-images').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
 }
 
 export async function addImage(
@@ -53,115 +35,137 @@ export async function addImage(
   file: File,
   order: number
 ): Promise<PostImage> {
-  const blob = file.slice();
-  const thumbnailBlob = await generateThumbnail(blob);
-  const record: StoredImage = {
-    id: crypto.randomUUID(),
+  const userId = await getCurrentUserId();
+  const imageId = crypto.randomUUID();
+  const ext = file.name.split('.').pop() || 'jpg';
+  const storagePath = `${userId}/${postId}/${imageId}.${ext}`;
+
+  // Upload to Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from('post-images')
+    .upload(storagePath, file, { contentType: file.type });
+  if (uploadError) throw uploadError;
+
+  // Insert metadata row
+  const { error: dbError } = await supabase
+    .from('post_images')
+    .insert({
+      id: imageId,
+      post_id: postId,
+      user_id: userId,
+      order,
+      filename: file.name,
+      mime_type: file.type,
+      size: file.size,
+      storage_path: storagePath,
+    });
+  if (dbError) throw dbError;
+
+  notifyChange();
+  return {
+    id: imageId,
     postId,
     order,
     filename: file.name,
     mimeType: file.type,
     size: file.size,
-    blob,
-    thumbnailBlob,
     createdAt: new Date().toISOString(),
   };
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).add(record);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
-  notifyChange();
-  const { blob: _b, thumbnailBlob: _t, ...meta } = record;
-  return meta;
 }
 
 export async function getImagesByPostId(postId: string): Promise<StoredImage[]> {
-  const db = await openDB();
-  const results = await new Promise<StoredImage[]>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const idx = tx.objectStore(STORE_NAME).index('postId');
-    const req = idx.getAll(postId);
-    req.onsuccess = () => resolve(req.result as StoredImage[]);
-    req.onerror = () => reject(req.error);
-  });
-  db.close();
-  return results.sort((a, b) => a.order - b.order);
+  const { data, error } = await supabase
+    .from('post_images')
+    .select('*')
+    .eq('post_id', postId)
+    .order('order');
+
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  return data.map((row) => ({
+    id: row.id,
+    postId: row.post_id,
+    order: row.order,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    size: row.size,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+    thumbnailUrl: getPublicUrl(row.storage_path),
+    fullUrl: getPublicUrl(row.storage_path),
+  }));
 }
 
 export async function deleteImage(imageId: string): Promise<void> {
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(imageId);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  // Get the storage path first
+  const { data: row, error: fetchError } = await supabase
+    .from('post_images')
+    .select('storage_path')
+    .eq('id', imageId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  // Delete from storage
+  if (row) {
+    await supabase.storage.from('post-images').remove([row.storage_path]);
+  }
+
+  // Delete metadata
+  const { error } = await supabase
+    .from('post_images')
+    .delete()
+    .eq('id', imageId);
+  if (error) throw error;
+
   notifyChange();
 }
 
 export async function deleteImagesByPostId(postId: string): Promise<void> {
-  const images = await getImagesByPostId(postId);
-  if (images.length === 0) return;
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    for (const img of images) {
-      store.delete(img.id);
-    }
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  const { data: rows } = await supabase
+    .from('post_images')
+    .select('storage_path')
+    .eq('post_id', postId);
+
+  if (rows && rows.length > 0) {
+    const paths = rows.map((r) => r.storage_path);
+    await supabase.storage.from('post-images').remove(paths);
+  }
+
+  await supabase
+    .from('post_images')
+    .delete()
+    .eq('post_id', postId);
+
   notifyChange();
 }
 
 export async function reorderImages(postId: string, orderedIds: string[]): Promise<void> {
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    orderedIds.forEach((id, index) => {
-      const req = store.get(id);
-      req.onsuccess = () => {
-        const record = req.result;
-        if (record && record.postId === postId) {
-          record.order = index;
-          store.put(record);
-        }
-      };
-    });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  const updates = orderedIds.map((id, index) =>
+    supabase
+      .from('post_images')
+      .update({ order: index })
+      .eq('id', id)
+      .eq('post_id', postId)
+  );
+  await Promise.all(updates);
   notifyChange();
 }
 
 export async function getImageCounts(): Promise<Map<string, number>> {
-  const db = await openDB();
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('post_images')
+    .select('post_id')
+    .eq('user_id', userId);
+
+  if (error) throw error;
   const counts = new Map<string, number>();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.openCursor();
-    req.onsuccess = () => {
-      const cursor = req.result;
-      if (cursor) {
-        const pid = (cursor.value as StoredImage).postId;
-        counts.set(pid, (counts.get(pid) || 0) + 1);
-        cursor.continue();
-      }
-    };
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  if (data) {
+    for (const row of data) {
+      counts.set(row.post_id, (counts.get(row.post_id) || 0) + 1);
+    }
+  }
   return counts;
 }
 
@@ -169,34 +173,57 @@ export async function getImagesByPostIds(postIds: string[]): Promise<Map<string,
   const result = new Map<string, StoredImage[]>();
   if (postIds.length === 0) return result;
   postIds.forEach((id) => result.set(id, []));
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const idx = tx.objectStore(STORE_NAME).index('postId');
-    for (const postId of postIds) {
-      const req = idx.getAll(postId);
-      req.onsuccess = () => {
-        const images = (req.result as StoredImage[]).sort((a, b) => a.order - b.order);
-        result.set(postId, images);
+
+  const { data, error } = await supabase
+    .from('post_images')
+    .select('*')
+    .in('post_id', postIds)
+    .order('order');
+
+  if (error) throw error;
+  if (data) {
+    for (const row of data) {
+      const img: StoredImage = {
+        id: row.id,
+        postId: row.post_id,
+        order: row.order,
+        filename: row.filename,
+        mimeType: row.mime_type,
+        size: row.size,
+        storagePath: row.storage_path,
+        createdAt: row.created_at,
+        thumbnailUrl: getPublicUrl(row.storage_path),
+        fullUrl: getPublicUrl(row.storage_path),
       };
+      const list = result.get(row.post_id) ?? [];
+      list.push(img);
+      result.set(row.post_id, list);
     }
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  }
   return result;
 }
 
 export async function getAllImages(): Promise<StoredImage[]> {
-  const db = await openDB();
-  const results = await new Promise<StoredImage[]>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).getAll();
-    req.onsuccess = () => resolve(req.result as StoredImage[]);
-    req.onerror = () => reject(req.error);
-  });
-  db.close();
-  return results;
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('post_images')
+    .select('*')
+    .eq('user_id', userId)
+    .order('order');
+
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    postId: row.post_id,
+    order: row.order,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    size: row.size,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+    thumbnailUrl: getPublicUrl(row.storage_path),
+    fullUrl: getPublicUrl(row.storage_path),
+  }));
 }
 
 export async function addImageFromBlob(
@@ -206,27 +233,39 @@ export async function addImageFromBlob(
   mimeType: string,
   order: number
 ): Promise<void> {
-  const thumbnailBlob = await generateThumbnail(blob);
-  const record: StoredImage = {
-    id: crypto.randomUUID(),
-    postId,
-    order,
-    filename,
-    mimeType,
-    size: blob.size,
-    blob,
-    thumbnailBlob,
-    createdAt: new Date().toISOString(),
-  };
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).add(record);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  const userId = await getCurrentUserId();
+  const imageId = crypto.randomUUID();
+  const ext = filename.split('.').pop() || 'jpg';
+  const storagePath = `${userId}/${postId}/${imageId}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('post-images')
+    .upload(storagePath, blob, { contentType: mimeType });
+  if (uploadError) throw uploadError;
+
+  const { error: dbError } = await supabase
+    .from('post_images')
+    .insert({
+      id: imageId,
+      post_id: postId,
+      user_id: userId,
+      order,
+      filename,
+      mime_type: mimeType,
+      size: blob.size,
+      storage_path: storagePath,
+    });
+  if (dbError) throw dbError;
   notifyChange();
+}
+
+// Helper for export — fetch image blob from storage URL
+export async function fetchImageBlob(storagePath: string): Promise<Blob> {
+  const { data, error } = await supabase.storage
+    .from('post-images')
+    .download(storagePath);
+  if (error) throw error;
+  return data;
 }
 
 export function blobToDataUrl(blob: Blob): Promise<string> {

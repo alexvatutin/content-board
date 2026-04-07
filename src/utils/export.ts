@@ -4,6 +4,7 @@ import type { Post, PostMetrics, SocialPlatform, PostStatus, ContentFormat } fro
 import { format } from 'date-fns';
 import {
   getImagesByPostId,
+  fetchImageBlob,
   blobToDataUrl,
   dataUrlToBlob,
   addImageFromBlob,
@@ -258,14 +259,19 @@ export async function exportToJSON(posts: Post[]): Promise<void> {
     const images = await getImagesByPostId(post.id);
     const imageData = [];
     for (const img of images) {
-      const dataUrl = await blobToDataUrl(img.blob);
-      imageData.push({
-        id: img.id,
-        order: img.order,
-        filename: img.filename,
-        mimeType: img.mimeType,
-        dataUrl,
-      });
+      try {
+        const blob = await fetchImageBlob(img.storagePath);
+        const dataUrl = await blobToDataUrl(blob);
+        imageData.push({
+          id: img.id,
+          order: img.order,
+          filename: img.filename,
+          mimeType: img.mimeType,
+          dataUrl,
+        });
+      } catch {
+        // Skip images that fail to download
+      }
     }
     postsWithImages.push({
       ...post,
@@ -284,7 +290,6 @@ export async function importFromJSON(file: File): Promise<Post[]> {
 
   const posts: Post[] = [];
   for (const item of data) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { images, ...post } = item;
     posts.push(post as Post);
 

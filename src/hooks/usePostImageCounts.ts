@@ -8,8 +8,12 @@ export function usePostImageCounts(): Map<string, number> {
     let cancelled = false;
 
     async function load() {
-      const result = await getImageCounts();
-      if (!cancelled) setCounts(result);
+      try {
+        const result = await getImageCounts();
+        if (!cancelled) setCounts(result);
+      } catch (err) {
+        console.error('Failed to load image counts:', err);
+      }
     }
 
     load();

@@ -1,4 +1,5 @@
-import { LayoutDashboard, LayoutGrid, List, BarChart3, Smartphone, Download, Upload, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, List, BarChart3, Smartphone, Download, Upload, Sun, Moon, LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import type { ViewMode } from '../../types';
 
 interface SidebarProps {
@@ -19,6 +20,8 @@ const NAV_ITEMS: { key: ViewMode; label: string; icon: typeof LayoutDashboard }[
 ];
 
 export function Sidebar({ view, onViewChange, onExport, onImport, dark, onToggleTheme }: SidebarProps) {
+  const { user, signOut } = useAuth();
+
   return (
     <aside className="w-52 h-full flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
       {/* Logo */}
@@ -73,6 +76,21 @@ export function Sidebar({ view, onViewChange, onExport, onImport, dark, onToggle
         >
           {dark ? <Sun size={15} /> : <Moon size={15} />}
           {dark ? 'Светлая тема' : 'Тёмная тема'}
+        </button>
+      </div>
+
+      {/* User & Logout */}
+      <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+        {user && (
+          <div className="px-3 py-1 mb-1 text-xs text-gray-500 dark:text-gray-400 truncate" title={user.email}>
+            {user.email}
+          </div>
+        )}
+        <button
+          onClick={signOut}
+          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors w-full"
+        >
+          <LogOut size={15} /> Выход
         </button>
       </div>
     </aside>

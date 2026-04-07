@@ -1,6 +1,12 @@
 <!doctype html>
-<html lang="ru" class="dark">
+<html lang="ru">
   <head>
+    <script>
+      try {
+        var v = localStorage.getItem('content-board-dark');
+        if (v === null || JSON.parse(v) === true) document.documentElement.classList.add('dark');
+      } catch(e) { document.documentElement.classList.add('dark'); }
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

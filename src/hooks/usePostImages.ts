@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { SocialPlatform, ContentFormat } from '../types';
 import { getMaxImages, MAX_FILE_SIZE } from '../utils/imageConstraints';
 import {
@@ -29,58 +29,42 @@ export function usePostImages(
 ) {
   const [images, setImages] = useState<ImageWithUrl[]>([]);
   const [loading, setLoading] = useState(false);
-  const urlsRef = useRef<string[]>([]);
 
   const maxImages = getMaxImages(platform, format);
   const canAddMore = images.length < maxImages;
   const remainingSlots = Math.max(0, maxImages - images.length);
   const overLimit = images.length > maxImages;
 
-  const revokeUrls = useCallback(() => {
-    urlsRef.current.forEach((u) => URL.revokeObjectURL(u));
-    urlsRef.current = [];
-  }, []);
-
   const loadImages = useCallback(async () => {
     if (!postId) {
-      revokeUrls();
       setImages([]);
       return;
     }
     setLoading(true);
     try {
       const stored = await getImagesByPostId(postId);
-      revokeUrls();
-      const mapped = stored.map((img: StoredImage) => {
-        const thumbUrl = URL.createObjectURL(img.thumbnailBlob);
-        const fullUrl = URL.createObjectURL(img.blob);
-        urlsRef.current.push(thumbUrl, fullUrl);
-        return {
-          id: img.id,
-          postId: img.postId,
-          order: img.order,
-          filename: img.filename,
-          mimeType: img.mimeType,
-          size: img.size,
-          thumbnailUrl: thumbUrl,
-          fullUrl: fullUrl,
-          createdAt: img.createdAt,
-        };
-      });
+      const mapped = stored.map((img: StoredImage) => ({
+        id: img.id,
+        postId: img.postId,
+        order: img.order,
+        filename: img.filename,
+        mimeType: img.mimeType,
+        size: img.size,
+        thumbnailUrl: img.thumbnailUrl,
+        fullUrl: img.fullUrl,
+        createdAt: img.createdAt,
+      }));
       setImages(mapped);
     } finally {
       setLoading(false);
     }
-  }, [postId, revokeUrls]);
+  }, [postId]);
 
   useEffect(() => {
     loadImages();
     const unsub = onImagesChange(() => loadImages());
-    return () => {
-      unsub();
-      revokeUrls();
-    };
-  }, [loadImages, revokeUrls]);
+    return () => { unsub(); };
+  }, [loadImages]);
 
   const addImages = useCallback(
     async (files: File[]) => {
