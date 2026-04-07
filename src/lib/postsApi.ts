@@ -121,9 +121,10 @@ export async function batchInsertPosts(userId: string, posts: Post[]): Promise<v
     const batch = rows.slice(i, i + 50);
     const { error } = await supabase
       .from('posts')
-      .upsert(batch, { onConflict: 'id' });
+      .insert(batch);
 
-    if (error) throw error;
+    // 23505 = duplicate key — posts already exist, safe to ignore
+    if (error && error.code !== '23505') throw error;
   }
 }
 
